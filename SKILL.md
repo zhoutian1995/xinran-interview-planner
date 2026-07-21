@@ -21,7 +21,7 @@ python scripts/xinran_interview.py validate --input research.json
 python scripts/xinran_interview.py render --input research.json --output interview-plan.md
 ```
 
-先运行 `init` 创建研究包，再运行 `queries` 生成检索计划，并用 `topics` 从内置话题库筛选候选。用可用的搜索、浏览器或用户资料完成研究，把来源、事实和候选话题写回研究包。运行 `score`、`validate`，最后运行 `render` 生成稳定骨架，再由 AI 补齐有判断力的内容。
+先运行 `init` 创建研究包，再运行 `queries` 生成检索计划，并用 `topics` 从内置话题库筛选候选。若环境提供搜索或浏览器工具，主动完成实时研究，不等待用户逐条提供链接；把来源、事实和候选话题写回研究包。运行 `score`、`validate`，最后运行 `render` 生成稳定骨架，再由 AI 补齐有判断力的内容。
 
 用户问“怎么用”“支持什么”“帮助”时，先运行 `python scripts/xinran_interview.py help`，根据输出回答。
 
@@ -39,6 +39,7 @@ python scripts/xinran_interview.py render --input research.json --output intervi
 
 - 开始策划前读取 [references/account-positioning.md](references/account-positioning.md)。
 - 给候选话题打分或处理敏感议题时读取 [references/editorial-rubric.md](references/editorial-rubric.md)。
+- 需要当前热点、人物近况或公开资料时读取 [references/live-research.md](references/live-research.md)。
 - 不要把 references 全部复述进输出。
 
 ## 必守边界
