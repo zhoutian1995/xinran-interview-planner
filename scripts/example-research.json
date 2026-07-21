@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "created": "2026-07-21",
+  "guest": {"name": "示例嘉宾", "identity": "学霸妈妈", "profile_url": ""},
+  "episode": {"platforms": ["小红书", "视频号"], "duration_minutes": 30, "publish_date": ""},
+  "positioning": {"account": "昕然有约", "audience": "一二线城市年轻人、中产及以上家庭", "pillars": ["education-family"]},
+  "research_queries": [],
+  "sources": [
+    {"title": "示例来源", "url": "https://example.com", "published_at": "2026-07-01", "accessed_at": "2026-07-21"}
+  ],
+  "facts": [
+    {"label": "待核实", "claim": "嘉宾曾处理过孩子阶段性厌学问题", "source_refs": [0]}
+  ],
+  "audience_questions": ["孩子不愿意上学时，父母首先应该处理成绩、情绪还是关系？"],
+  "topic_candidates": [
+    {
+      "title": "孩子不愿意上学时，真正需要解决的是什么？",
+      "pillar": "education-family",
+      "rationale": "从真实家庭问题切入，而不是只展示名校结果。",
+      "risk": "单个家庭经验不能包装成普遍规律。",
+      "scores": {"guest_fit": 5, "audience_need": 5, "timeliness": 4, "depth": 5, "distribution": 4, "safety": 4}
+    }
+  ],
+  "opening_options": [],
+  "notes": []
+}

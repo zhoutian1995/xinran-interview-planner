@@ -1,0 +1,4 @@
+interface:
+  display_name: "昕然有约采访策划"
+  short_description: "输入嘉宾姓名，研究观众问题、近期热点并生成采访方案"
+  default_prompt: "使用 $xinran-interview-planner 为昕然有约研究这位嘉宾，并生成可录制的访前策划。嘉宾："
