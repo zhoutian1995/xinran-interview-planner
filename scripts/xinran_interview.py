@@ -21,6 +21,7 @@ PILLARS = {
 
 SCORE_FIELDS = ("guest_fit", "audience_need", "timeliness", "depth", "distribution", "safety")
 FACT_LABELS = {"已证实", "嘉宾自述", "媒体报道", "待核实", "策划假设"}
+TOPIC_LIBRARY = Path(__file__).resolve().parent.parent / "references" / "topic-library.json"
 
 
 def dump(data: Any, path: str | None = None) -> None:
@@ -33,6 +34,26 @@ def dump(data: Any, path: str | None = None) -> None:
 
 def load(path: str) -> dict[str, Any]:
     return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def load_topics() -> list[dict[str, Any]]:
+    return json.loads(TOPIC_LIBRARY.read_text(encoding="utf-8"))
+
+
+def filter_topics(tags: list[str] | None = None, keyword: str = "", pillar: str = "") -> list[dict[str, Any]]:
+    wanted = [item.casefold() for item in (tags or [])]
+    needle = keyword.casefold().strip()
+    results = []
+    for topic in load_topics():
+        haystack = " ".join([topic.get("topic", ""), topic.get("hotspot", ""), *topic.get("tags", []), *topic.get("guest_types", [])]).casefold()
+        if pillar and topic.get("pillar") != pillar:
+            continue
+        if wanted and not all(tag in haystack for tag in wanted):
+            continue
+        if needle and needle not in haystack:
+            continue
+        results.append(topic)
+    return results
 
 
 def search_queries(guest: str, identity: str = "", pillars: list[str] | None = None) -> list[dict[str, str]]:
@@ -231,6 +252,12 @@ def build_parser() -> argparse.ArgumentParser:
     queries.add_argument("--pillar", action="append", choices=sorted(PILLARS))
     queries.add_argument("--output")
 
+    topics = sub.add_parser("topics", help="按嘉宾身份、关键词或内容主线筛选内置采访话题库")
+    topics.add_argument("--tag", action="append", help="标签或嘉宾类型，可重复，例如 自媒体、MIT妈妈")
+    topics.add_argument("--keyword", default="", help="关键词，例如 AI、机器人、短剧")
+    topics.add_argument("--pillar", choices=sorted(PILLARS), default="", help="限定内容主线")
+    topics.add_argument("--output")
+
     score = sub.add_parser("score", help="计算 topic_candidates 六维分数和推荐级别")
     score.add_argument("--input", required=True)
     score.add_argument("--output", help="默认覆盖输入文件；使用 - 打印到 stdout")
@@ -249,10 +276,11 @@ def print_help_text() -> None:
 
 1. init：创建嘉宾研究包。
 2. queries：生成检索式，用搜索/浏览器完成身份消歧与热点研究。
-3. 填写 sources、facts、audience_questions、topic_candidates。
-4. score：计算六维总分与主选题/备选建议。
-5. validate：检查来源、事实标签和评分完整性。
-6. render：生成 Markdown 策划骨架，由 AI 完成独立开场、追问树和传播判断。
+3. topics：按嘉宾身份、关键词和内容主线筛选内置话题库。
+4. 填写 sources、facts、audience_questions、topic_candidates。
+5. score：计算六维总分与主选题/备选建议。
+6. validate：检查来源、事实标签和评分完整性。
+7. render：生成 Markdown 策划骨架，由 AI 完成独立开场、追问树和传播判断。
 
 话题评分字段：guest_fit、audience_need、timeliness、depth、distribution、safety，均为 1-5。
 事实标签：已证实、嘉宾自述、媒体报道、待核实、策划假设。
@@ -269,6 +297,8 @@ def main() -> int:
             dump(new_packet(args), args.output)
         elif args.command == "queries":
             dump(search_queries(args.guest, args.identity, args.pillar), args.output)
+        elif args.command == "topics":
+            dump(filter_topics(args.tag, args.keyword, args.pillar), args.output)
         elif args.command == "score":
             packet = score_packet(load(args.input))
             output = None if args.output == "-" else (args.output or args.input)

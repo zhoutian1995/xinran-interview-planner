@@ -2,7 +2,7 @@
 
 “昕然有约”人物采访策划 Skill：输入嘉宾姓名，研究观众问题、人物经历与近期热点，生成可录制、可追问、可切片的访前方案。
 
-> 有问题，昕然带你去见个朋友。
+> 有问题，昕然带你去找答案。
 
 ## 账号定位
 
@@ -124,6 +124,18 @@ python scripts/xinran_interview.py queries \
 
 ### 3. 填写研究结果
 
+### 3. 从内置话题库筛选
+
+```bash
+python scripts/xinran_interview.py topics --tag "自媒体" --keyword "AI"
+python scripts/xinran_interview.py topics --tag "老爸评测" --keyword "机器人"
+python scripts/xinran_interview.py topics --tag "霞姐" --pillar career-wealth
+```
+
+话题库包含 AI、机器人、短剧、教育职业、消费社会和城市公共话题。它只提供候选入口，最终仍需结合嘉宾一手经历和实时热点核验。
+
+### 4. 填写研究结果
+
 把公开资料写入 `research.json`：
 
 - `sources`：标题、URL、发布日期、访问日期
@@ -133,7 +145,7 @@ python scripts/xinran_interview.py queries \
 
 事实标签只能使用：`已证实`、`嘉宾自述`、`媒体报道`、`待核实`、`策划假设`。
 
-### 4. 评分
+### 5. 评分
 
 ```bash
 python scripts/xinran_interview.py score --input research.json
@@ -150,13 +162,13 @@ python scripts/xinran_interview.py score --input research.json
 
 工具会自动计算总分并给出主选题、条件主选题、备选或删除建议。
 
-### 5. 校验
+### 6. 校验
 
 ```bash
 python scripts/xinran_interview.py validate --input research.json
 ```
 
-### 6. 生成策划骨架
+### 7. 生成策划骨架
 
 ```bash
 python scripts/xinran_interview.py render --input research.json --output interview-plan.md
@@ -179,10 +191,12 @@ Agent 再基于该骨架完成独立开场、采访结构、追问树、标题�
 ## 关键原则
 
 - 每位嘉宾单独策划，不设置统一开场模板。
+- 前 10 秒先出现具体矛盾，随后再用嘉宾身份建立可信度。
 - AI 和机器人只在与嘉宾有真实连接时使用。
 - 热点服务于人物和观众问题，不用热搜替代人物研究。
 - 名校只是结果，重点追问问题、错误、选择和适用边界。
 - 圈层只是入口，重点是人物真实经历和观众可参考的答案。
+- 每位嘉宾默认规划 1 条主访谈、2—3 条具体问题切片、1 条昕然采访手记。
 
 ## 测试
 

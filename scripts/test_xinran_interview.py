@@ -35,6 +35,12 @@ class CliTests(unittest.TestCase):
             self.assertEqual(self.run_cli("render", "--input", str(packet_path), "--output", str(plan_path)).returncode, 0)
             self.assertIn("昕然有约 × 测试嘉宾", plan_path.read_text(encoding="utf-8"))
 
+    def test_topics_filter(self):
+        result = self.run_cli("topics", "--tag", "老爸评测", "--keyword", "机器人")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        self.assertTrue(any(item["id"] == "robot-buying-guide" for item in data))
+
 
 if __name__ == "__main__":
     unittest.main()
