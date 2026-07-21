@@ -20,6 +20,7 @@ PILLARS = {
 }
 
 SCORE_FIELDS = ("guest_fit", "audience_need", "timeliness", "depth", "distribution", "safety")
+HOTSPOT_SCORE_FIELDS = ("recency", "source_diversity", "cross_platform", "momentum", "audience_relevance", "interviewability")
 FACT_LABELS = {"已证实", "嘉宾自述", "媒体报道", "待核实", "策划假设"}
 TOPIC_LIBRARY = Path(__file__).resolve().parent.parent / "references" / "topic-library.json"
 
@@ -92,6 +93,7 @@ def new_packet(args: argparse.Namespace) -> dict[str, Any]:
         "sources": [],
         "facts": [],
         "audience_questions": [],
+        "hotspot_candidates": [],
         "topic_candidates": [],
         "opening_options": [],
         "notes": [],
@@ -129,6 +131,31 @@ def score_packet(packet: dict[str, Any]) -> dict[str, Any]:
     return packet
 
 
+def rank_hotspots(packet: dict[str, Any]) -> dict[str, Any]:
+    for hotspot in packet.get("hotspot_candidates", []):
+        scores = hotspot.setdefault("scores", {})
+        missing = [key for key in HOTSPOT_SCORE_FIELDS if key not in scores]
+        if missing:
+            hotspot["score_error"] = f"missing: {', '.join(missing)}"
+            continue
+        values = [int(scores[key]) for key in HOTSPOT_SCORE_FIELDS]
+        if any(value < 1 or value > 5 for value in values):
+            hotspot["score_error"] = "hotspot scores must be integers from 1 to 5"
+            continue
+        hotspot["total_score"] = sum(values)
+        hotspot.pop("score_error", None)
+        hotspot["eligible"] = (
+            hotspot["total_score"] >= 22
+            and scores["audience_relevance"] >= 4
+            and scores["interviewability"] >= 4
+            and len(hotspot.get("source_refs", [])) >= 3
+        )
+    ranked = sorted(packet.get("hotspot_candidates", []), key=lambda x: x.get("total_score", -1), reverse=True)
+    packet["hotspot_candidates"] = ranked
+    packet["selected_hotspots"] = [item.get("id") for item in ranked if item.get("eligible")][:4]
+    return packet
+
+
 def validate_packet(packet: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     guest = packet.get("guest", {})
@@ -148,6 +175,24 @@ def validate_packet(packet: dict[str, Any]) -> list[str]:
             errors.append(f"topic_candidates[{index}] missing title")
         if "score_error" in topic:
             errors.append(f"topic_candidates[{index}] {topic['score_error']}")
+    selected = set(packet.get("selected_hotspots", []))
+    if len(selected) != 4:
+        errors.append("exactly 4 eligible hotspots must be selected")
+    for index, hotspot in enumerate(packet.get("hotspot_candidates", []), 1):
+        if "score_error" in hotspot:
+            errors.append(f"hotspot_candidates[{index}] {hotspot['score_error']}")
+        if hotspot.get("id") in selected:
+            if not hotspot.get("reason"):
+                errors.append(f"hotspot_candidates[{index}] missing reason")
+            if not hotspot.get("lifecycle"):
+                errors.append(f"hotspot_candidates[{index}] missing lifecycle")
+            interview_topics = hotspot.get("interview_topics", [])
+            if len(interview_topics) != 5:
+                errors.append(f"hotspot_candidates[{index}] must contain exactly 5 interview_topics")
+            for topic_index, interview_topic in enumerate(interview_topics, 1):
+                for field in ("question", "recommended_guests", "guest_reason", "evidence_target"):
+                    if not interview_topic.get(field):
+                        errors.append(f"hotspot_candidates[{index}].interview_topics[{topic_index}] missing {field}")
     return errors
 
 
@@ -156,11 +201,14 @@ def md(value: Any) -> str:
 
 
 def render(packet: dict[str, Any]) -> str:
+    packet = rank_hotspots(packet)
     guest = packet.get("guest", {})
     episode = packet.get("episode", {})
     topics = packet.get("topic_candidates", [])
     primary = [x for x in topics if x.get("recommendation") in {"主选题", "有条件主选题"}][:3]
     backup = [x for x in topics if x.get("recommendation") == "备选"][:2]
+    selected_ids = set(packet.get("selected_hotspots", []))
+    selected_hotspots = [item for item in packet.get("hotspot_candidates", []) if item.get("id") in selected_ids]
     lines = [
         f"# 昕然有约 × {md(guest.get('name'))} 访前策划",
         "",
@@ -169,13 +217,29 @@ def render(packet: dict[str, Any]) -> str:
         f"- 平台：{', '.join(episode.get('platforms', [])) or '待补充'}",
         f"- 建议时长：{md(episode.get('duration_minutes'))} 分钟",
         "",
-        "## 1. 一页结论",
+        "## 1. 四大热点与20个采访话题",
         "",
-        "- 是否值得现在采访：待 AI 判断",
-        "- 观众正在面对的问题：待 AI 从 audience_questions 提炼",
-        "- 推荐主命题：待 AI 从高分话题提炼",
-        "- 最大机会与风险：待 AI 判断",
-        "",
+    ]
+    if selected_hotspots:
+        for number, hotspot in enumerate(selected_hotspots, 1):
+            lines += [
+                f"### 热点{number}：{md(hotspot.get('title'))}",
+                "",
+                f"**热点为什么成立：** {md(hotspot.get('reason'))}",
+                "",
+                f"- 热度阶段：{md(hotspot.get('lifecycle'))}",
+                f"- 热点评分：{md(hotspot.get('total_score'))}/30",
+                "",
+                "| 采访话题 | 推荐嘉宾 | 为什么适合 | 要拿到的证据 |",
+                "|---|---|---|---|",
+            ]
+            for interview_topic in hotspot.get("interview_topics", []):
+                guests = "、".join(interview_topic.get("recommended_guests", [])) if isinstance(interview_topic.get("recommended_guests"), list) else md(interview_topic.get("recommended_guests"))
+                lines.append(f"| {md(interview_topic.get('question'))} | {guests} | {md(interview_topic.get('guest_reason'))} | {md(interview_topic.get('evidence_target'))} |")
+            lines.append("")
+    else:
+        lines += ["- 尚未形成4个达到门槛的热点。", ""]
+    lines += [
         "## 2. 身份核验与嘉宾画像",
         "",
     ]
@@ -237,7 +301,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("help", help="显示推荐工作流和研究包字段说明")
 
     init = sub.add_parser("init", help="为一位嘉宾初始化 JSON 研究包")
-    init.add_argument("--guest", required=True, help="嘉宾姓名")
+    init.add_argument("--guest", default="待定", help="嘉宾姓名；做热点选题时可不填")
     init.add_argument("--identity", default="", help="身份线索，用于同名消歧")
     init.add_argument("--profile-url", default="", help="嘉宾主页链接")
     init.add_argument("--platform", action="append", help="目标平台，可重复")
@@ -258,6 +322,10 @@ def build_parser() -> argparse.ArgumentParser:
     topics.add_argument("--pillar", choices=sorted(PILLARS), default="", help="限定内容主线")
     topics.add_argument("--output")
 
+    rank = sub.add_parser("rank-hotspots", help="按证据六维评分排序热点并选出前4名")
+    rank.add_argument("--input", required=True)
+    rank.add_argument("--output", help="默认覆盖输入文件；使用 - 打印到 stdout")
+
     score = sub.add_parser("score", help="计算 topic_candidates 六维分数和推荐级别")
     score.add_argument("--input", required=True)
     score.add_argument("--output", help="默认覆盖输入文件；使用 - 打印到 stdout")
@@ -274,15 +342,15 @@ def build_parser() -> argparse.ArgumentParser:
 def print_help_text() -> None:
     print("""昕然有约采访策划推荐流程
 
-1. init：创建嘉宾研究包。
-2. queries：生成检索式，用搜索/浏览器完成身份消歧与热点研究。
-3. topics：按嘉宾身份、关键词和内容主线筛选内置话题库。
-4. 填写 sources、facts、audience_questions、topic_candidates。
-5. score：计算六维总分与主选题/备选建议。
-6. validate：检查来源、事实标签和评分完整性。
-7. render：生成 Markdown 策划骨架，由 AI 完成独立开场、追问树和传播判断。
+1. init：创建研究包。
+2. 用搜索/浏览器采集候选热点及来源证据。
+3. rank-hotspots：按六维证据评分选出4个热点。
+4. 每个热点填写恰好5个采访话题、推荐嘉宾和匹配理由。
+5. validate：检查4×5结构、来源和事实标签。
+6. render：生成四大热点、20个话题和后续访前策划骨架。
 
 话题评分字段：guest_fit、audience_need、timeliness、depth、distribution、safety，均为 1-5。
+热点评分字段：recency、source_diversity、cross_platform、momentum、audience_relevance、interviewability，均为 1-5。
 事实标签：已证实、嘉宾自述、媒体报道、待核实、策划假设。
 """)
 
@@ -299,12 +367,16 @@ def main() -> int:
             dump(search_queries(args.guest, args.identity, args.pillar), args.output)
         elif args.command == "topics":
             dump(filter_topics(args.tag, args.keyword, args.pillar), args.output)
+        elif args.command == "rank-hotspots":
+            packet = rank_hotspots(load(args.input))
+            output = None if args.output == "-" else (args.output or args.input)
+            dump(packet, output)
         elif args.command == "score":
             packet = score_packet(load(args.input))
             output = None if args.output == "-" else (args.output or args.input)
             dump(packet, output)
         elif args.command == "validate":
-            errors = validate_packet(score_packet(load(args.input)))
+            errors = validate_packet(rank_hotspots(score_packet(load(args.input))))
             if errors:
                 for error in errors:
                     print(f"ERROR: {error}")

@@ -1,6 +1,6 @@
 # Xinran Interview Planner
 
-“昕然有约”人物采访策划 Skill：输入嘉宾姓名，研究观众问题、人物经历与近期热点，生成可录制、可追问、可切片的访前方案。
+“昕然有约”热点发现与人物采访策划 Skill：先找出4个有证据的热点，每个热点展开5个具体采访话题并推荐嘉宾，再为确认的嘉宾生成访前方案。
 
 > 有问题，昕然带你去找答案。
 
@@ -26,6 +26,8 @@ SKILL.md 只保存调用流程和硬边界。重复、确定性的工作交给 `
 - 计算候选话题六维评分
 - 校验来源、事实标签和评分字段
 - 渲染统一的 Markdown 策划骨架
+- 按证据六维评分选出4个热点
+- 校验每个热点是否恰好包含5个话题和嘉宾推荐
 - 提供 CLI 帮助
 
 AI 只负责需要判断的部分：核验人物、理解观众问题、发现独特故事、设计独立开场、形成追问和传播策略。
@@ -42,6 +44,18 @@ AI 只负责需要判断的部分：核验人物、理解观众问题、发现�
 研究按近 7 天、30 天、90 天分层，并记录来源、发布日期和访问日期。动态页面、社交平台或需要登录的内容可以使用当前环境的浏览器会话。
 
 Skill 本身不会捆绑或强制安装某个浏览器。浏览能力取决于运行它的 Codex 环境；没有联网工具时会明确提示“未完成实时热点核验”，并返回检索式和长青候选，不会伪造实时结果。
+
+## 核心输出：4×5
+
+每次热点策划必须输出：
+
+- 4个经过来源证据和评分筛选的热点
+- 每个热点为什么现在成立、由什么事件推动、处于什么生命周期
+- 每个热点5个具体采访问题
+- 每个问题推荐什么嘉宾，以及为什么该嘉宾有资格回答
+- 每个问题希望采访拿到什么一手证据
+
+热点按新鲜度、来源多样性、跨平台扩散、增长信号、目标人群相关性和可采访性评分。总分至少22分，且目标人群相关性、可采访性不得低于4分。
 
 ## 安装
 
@@ -89,7 +103,7 @@ python scripts/xinran_interview.py help
 
 ```bash
 python scripts/xinran_interview.py init \
-  --guest "嘉宾姓名" \
+  --guest "嘉宾姓名或待定" \
   --identity "身份线索" \
   --platform "小红书" \
   --platform "视频号" \
@@ -135,9 +149,19 @@ python scripts/xinran_interview.py queries \
 | `xinran-personal` | 昕然个人内容 |
 | `ai-robotics` | AI 与机器人 |
 
+### 3. 排名热点
+
+搜索后把候选热点、来源引用和六维评分写入研究包：
+
+```bash
+python scripts/xinran_interview.py rank-hotspots --input research.json
+```
+
+工具只选择达到门槛的前4个热点。每个入选热点还必须填写5个 `interview_topics`，包括 `question`、`recommended_guests`、`guest_reason` 和 `evidence_target`。
+
 ### 3. 填写研究结果
 
-### 3. 从内置话题库筛选
+### 4. 从内置话题库筛选
 
 ```bash
 python scripts/xinran_interview.py topics --tag "自媒体" --keyword "AI"
@@ -147,7 +171,7 @@ python scripts/xinran_interview.py topics --tag "霞姐" --pillar career-wealth
 
 话题库包含 AI、机器人、短剧、教育职业、消费社会和城市公共话题。它只提供候选入口，最终仍需结合嘉宾一手经历和实时热点核验。
 
-### 4. 填写研究结果
+### 5. 填写研究结果
 
 把公开资料写入 `research.json`：
 
@@ -158,7 +182,7 @@ python scripts/xinran_interview.py topics --tag "霞姐" --pillar career-wealth
 
 事实标签只能使用：`已证实`、`嘉宾自述`、`媒体报道`、`待核实`、`策划假设`。
 
-### 5. 评分
+### 6. 嘉宾话题评分
 
 ```bash
 python scripts/xinran_interview.py score --input research.json
@@ -175,13 +199,13 @@ python scripts/xinran_interview.py score --input research.json
 
 工具会自动计算总分并给出主选题、条件主选题、备选或删除建议。
 
-### 6. 校验
+### 7. 校验
 
 ```bash
 python scripts/xinran_interview.py validate --input research.json
 ```
 
-### 7. 生成策划骨架
+### 8. 生成策划骨架
 
 ```bash
 python scripts/xinran_interview.py render --input research.json --output interview-plan.md
